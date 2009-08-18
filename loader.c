@@ -32,6 +32,8 @@ open_executable(const char * filename)
         return 1;
     }
 
+    fprintf(stderr, "CPU type: %d %d\n", header->cputype, header->cpusubtype);
+
     free(header);
     return 0;
 }
