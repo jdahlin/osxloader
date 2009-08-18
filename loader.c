@@ -23,18 +23,21 @@ open_executable(const char * filename)
     if (errno) {
         fprintf(stderr, "error reading file: %s\n", strerror(errno));
         free(header);
+        fclose(fp);
         return 1;
     }
 
     if (header->magic != MACHO_MAGIC) {
         fprintf(stderr, "error: %s is not a Mach-O binary.\n", filename);
         free(header);
+        fclose(fp);
         return 1;
     }
 
     fprintf(stderr, "CPU type: %d %d\n", header->cputype, header->cpusubtype);
 
     free(header);
+    fclose(fp);
     return 0;
 }
 
