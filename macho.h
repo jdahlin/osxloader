@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#define MACHO_MAGIC 0xfeedface
+#define MH_MAGIC 0xfeedface
 
 struct mach_header
    {

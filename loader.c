@@ -27,7 +27,7 @@ open_executable(const char * filename)
         return 1;
     }
 
-    if (header->magic != MACHO_MAGIC) {
+    if (header->magic != MH_MAGIC) {
         fprintf(stderr, "error: %s is not a Mach-O binary.\n", filename);
         free(header);
         fclose(fp);
