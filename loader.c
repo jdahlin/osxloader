@@ -17,9 +17,13 @@ open_executable(const char * filename)
         return 1;
     }
 
-    header = (struct mach_header*)malloc(sizeof(header));
-    if (fread(header, 1, sizeof(header), fp) != sizeof(header)) {
+    header = (struct mach_header*)malloc(sizeof(struct mach_header));
+    errno = 0;
+    fread(header, sizeof(struct mach_header), 1, fp);
+    if (errno) {
         fprintf(stderr, "error reading file: %s\n", strerror(errno));
+        free(header);
+        return 1;
     }
 
     if (header->magic != MACHO_MAGIC) {
