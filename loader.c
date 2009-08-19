@@ -28,14 +28,34 @@ open_executable(const char * filename)
     }
 
     if (header->magic != MH_MAGIC) {
-        fprintf(stderr, "error: %s is not a Mach-O binary.\n", filename);
+        fprintf(stderr, "error: %s is not a Mach-O binary (magic was %x).\n",
+                filename, header->magic);
         free(header);
         fclose(fp);
         return 1;
     }
 
-    fprintf(stderr, "CPU type: %d %d\n", header->cputype, header->cpusubtype);
+#ifdef __i386__
+    if (header->cputype != CPU_TYPE_X86) {
+        fprintf(stderr, "error: %s is not a x86 binary (cputype: %d).\n",
+                filename, header->cputype);
+        free(header);
+        fclose(fp);
+        return 1;
+    }
+#else
+#  error "unsupported architecture"
+#endif
 
+    switch (header->filetype) {
+      case MH_EXECUTE:
+        break;
+      default:
+        fprintf(stderr, "ERROR: Unsupported Mach-O file types: %d\n", header->filetype);
+        goto error;
+    }
+
+error:
     free(header);
     fclose(fp);
     return 0;
