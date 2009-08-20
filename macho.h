@@ -60,3 +60,32 @@ struct load_command {
 #define LC_TWOLEVEL_HINTS 0x16
 #define LC_PREBIND_CKSUM  0x17
 #define LC_UUID           0x1b
+
+/* thread state */
+typedef struct mach_i386_thread_state {
+      unsigned int eax;
+      unsigned int ebx;
+      unsigned int ecx;
+      unsigned int edx;
+      unsigned int edi;
+      unsigned int esi;
+      unsigned int ebp;
+      unsigned int esp;
+      unsigned int ss;
+      unsigned int eflags;
+      unsigned int eip;
+      unsigned int cs;
+      unsigned int ds;
+      unsigned int es;
+      unsigned int fs;
+      unsigned int gs;
+} mach_i386_thread_state_t;
+
+struct thread_command {
+    uint32_t cmd;
+    uint32_t cmdsize;
+    uint32_t flavor;
+    uint32_t count;
+    struct mach_i386_thread_state state;
+};
+

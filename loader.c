@@ -64,8 +64,11 @@ open_executable(const char * filename)
             break;
         case LC_SYMTAB:
             break;
-        case LC_UNIXTHREAD:
+        case LC_UNIXTHREAD: {
+            struct thread_command *threadcmd = (struct thread_command*)loadcmd;
+            fprintf(stderr, "eip: 0x%x\n", threadcmd->state.eip);
             break;
+        }
         case LC_DYSYMTAB:
             break;
         case LC_LOAD_DYLINKER:
