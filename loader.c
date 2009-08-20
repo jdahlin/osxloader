@@ -9,7 +9,9 @@ static int
 open_executable(const char * filename)
 {
     FILE *fp;
-    struct mach_header *header;
+    struct mach_header *header = NULL;
+    struct load_command *loadcmds = NULL, *loadcmd;
+    int i;
 
     fp = fopen(filename, "r");
     if (!fp) {
@@ -22,26 +24,20 @@ open_executable(const char * filename)
     fread(header, sizeof(struct mach_header), 1, fp);
     if (errno) {
         fprintf(stderr, "error reading file: %s\n", strerror(errno));
-        free(header);
-        fclose(fp);
-        return 1;
+        goto error;
     }
 
     if (header->magic != MH_MAGIC) {
         fprintf(stderr, "error: %s is not a Mach-O binary (magic was %x).\n",
                 filename, header->magic);
-        free(header);
-        fclose(fp);
-        return 1;
+        goto error;
     }
 
 #ifdef __i386__
     if (header->cputype != CPU_TYPE_X86) {
         fprintf(stderr, "error: %s is not a x86 binary (cputype: %d).\n",
                 filename, header->cputype);
-        free(header);
-        fclose(fp);
-        return 1;
+        goto error;
     }
 #else
 #  error "unsupported architecture"
@@ -55,8 +51,40 @@ open_executable(const char * filename)
         goto error;
     }
 
+    loadcmds = malloc(header->sizeofcmds);
+    if (fread(loadcmds, header->sizeofcmds, 1, fp) < 0) {
+        fprintf(stderr, "error reading file: %s\n", strerror(errno));
+        goto error;
+    }
+
+    for (i = 0, loadcmd = loadcmds; i < header->ncmds; ++i,
+         loadcmd = (struct load_command*)((int)(loadcmd)+(loadcmd->cmdsize))) {
+        switch(loadcmd->cmd) {
+        case LC_SEGMENT:
+            break;
+        case LC_SYMTAB:
+            break;
+        case LC_UNIXTHREAD:
+            break;
+        case LC_DYSYMTAB:
+            break;
+        case LC_LOAD_DYLINKER:
+            break;
+        case LC_LOAD_DYLIB:
+            break;
+        case LC_UUID:
+            break;
+        default:
+            fprintf(stderr, "load command 0x%02x not supported\n", loadcmd->cmd);
+            break;
+        }
+    }
+
 error:
-    free(header);
+    if (loadcmds)
+        free(loadcmds);
+    if (header)
+        free(header);
     fclose(fp);
     return 0;
 }
