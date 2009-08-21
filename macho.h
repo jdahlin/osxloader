@@ -61,6 +61,44 @@ struct load_command {
 #define LC_PREBIND_CKSUM  0x17
 #define LC_UUID           0x1b
 
+/* segment state */
+struct segment_command
+   {
+   uint32_t cmd;
+   uint32_t cmdsize;
+   char segname[16];
+   uint32_t vmaddr;
+   uint32_t vmsize;
+   uint32_t fileoff;
+   uint32_t filesize;
+   int maxprot;
+   int initprot;
+   uint32_t nsects;
+   uint32_t flags;
+};
+
+#define VM_PROT_NONE    0x00
+#define VM_PROT_READ    0x01
+#define VM_PROT_WRITE   0x02
+#define VM_PROT_EXECUTE 0x04
+
+/* section state */
+
+struct section
+   {
+   char sectname[16];
+   char segname[16];
+   uint32_t addr;
+   uint32_t size;
+   uint32_t offset;
+   uint32_t align;
+   uint32_t reloff;
+   uint32_t nreloc;
+   uint32_t flags;
+   uint32_t reserved1;
+   uint32_t reserved2;
+};
+
 /* thread state */
 typedef struct mach_i386_thread_state {
       unsigned int eax;

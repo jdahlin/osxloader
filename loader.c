@@ -1,9 +1,52 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
 
 #include "macho.h"
+
+static void
+map_segment_command(FILE *fp, const struct segment_command *command)
+{
+    int mmap_prot = 0;
+
+    fprintf(stderr, "name: %-16s prot: 0x%02x, size: 0x%04x, off: 0x%04x\n",
+            command->segname, command->initprot, command->cmdsize,
+            command->fileoff);
+
+    if (command->initprot & VM_PROT_READ)
+        mmap_prot |= PROT_READ;
+    if (command->initprot & VM_PROT_WRITE)
+        mmap_prot |= PROT_WRITE;
+    if (command->initprot & VM_PROT_EXECUTE)
+        mmap_prot |= PROT_EXEC;
+
+    if (!strcmp(command->segname, "__PAGEZERO")) {
+        int fd = open("/dev/zero", O_RDONLY);
+        if (fd == -1) {
+            fprintf(stderr, "failed to open /dev/zero for reading: %s\n",
+                    strerror(errno));
+            return;
+        }
+        errno = 0;
+        if (mmap(NULL, command->vmsize, mmap_prot,
+                 MAP_FIXED | MAP_PRIVATE | MAP_ANON, fd, 0) == (void*)-1) {
+            fprintf(stderr, "failed to map page zero segment: %s\n",
+                    strerror(errno));
+        }
+        close(fd);
+        return;
+    }
+
+    if (mmap((void*)command->vmaddr, command->filesize, mmap_prot,
+             MAP_FIXED | MAP_PRIVATE, fileno(fp),
+             /* fixme: fat offset*/ 0 + command->fileoff) == (void*)-1) {
+            fprintf(stderr, "failed to map %s segment: %s\n",
+                    command->segname, strerror(errno));
+    }
+}
 
 static int
 open_executable(const char * filename)
@@ -58,10 +101,13 @@ open_executable(const char * filename)
     }
 
     for (i = 0, loadcmd = loadcmds; i < header->ncmds; ++i,
-         loadcmd = (struct load_command*)((int)(loadcmd)+(loadcmd->cmdsize))) {
+        loadcmd = (struct load_command*)((int)(loadcmd)+(loadcmd->cmdsize))) {
         switch(loadcmd->cmd) {
-        case LC_SEGMENT:
+        case LC_SEGMENT: {
+            struct segment_command *segcmd = (struct segment_command*)loadcmd;
+            map_segment_command(fp, segcmd);
             break;
+        }
         case LC_SYMTAB:
             break;
         case LC_UNIXTHREAD: {
