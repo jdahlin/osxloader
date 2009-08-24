@@ -48,6 +48,45 @@ map_segment_command(FILE *fp, const struct segment_command *command)
     }
 }
 
+#define STACK_SIZE (8192 * 1024)
+
+static int
+create_stack(void)
+{
+    int * stack;
+
+    stack = mmap(0, STACK_SIZE,
+                 PROT_READ | PROT_WRITE,
+                 MAP_PRIVATE | MAP_ANONYMOUS,
+                 -1, 0);
+    if (stack == (void*)-1) {
+        fprintf(stderr, "failed to map page zero segment: %s\n",
+                strerror(errno));
+    }
+
+    bzero(stack, STACK_SIZE);
+    return (int)stack + STACK_SIZE;
+}
+
+static inline void
+start_executing(int entry_point, int stack_base,
+                int argc, char **argv, char **env)
+{
+    __asm__("push %0" : : "g" (argc));
+    __asm__("push %0" : : "g" (argv[0]));
+    __asm__("push %0" : : "g" (0));
+    __asm__("push %0" : : "g" (env[0]));
+    __asm__("push %0" : : "g" (0));
+    __asm__("push %0" : : "g" (argv[0]));
+    __asm__("push %0" : : "g" (0));
+
+#ifdef DEBUG
+    __asm__("int $03");
+#endif
+    /* jump to the executable entry point, start: */
+    __asm__("jmp *%0" : : "g" (entry_point));
+}
+
 static int
 open_executable(const char * filename)
 {
@@ -55,6 +94,10 @@ open_executable(const char * filename)
     struct mach_header *header = NULL;
     struct load_command *loadcmds = NULL, *loadcmd;
     int i;
+    int entry_point;
+    int stack_base;
+    char **env, **argv;
+    int argc;
 
     fp = fopen(filename, "r");
     if (!fp) {
@@ -112,7 +155,7 @@ open_executable(const char * filename)
             break;
         case LC_UNIXTHREAD: {
             struct thread_command *threadcmd = (struct thread_command*)loadcmd;
-            fprintf(stderr, "eip: 0x%x\n", threadcmd->state.eip);
+            entry_point = threadcmd->state.eip;
             break;
         }
         case LC_DYSYMTAB:
@@ -129,6 +172,20 @@ open_executable(const char * filename)
         }
     }
 
+    stack_base = create_stack();
+
+    env = malloc(sizeof(char*));
+    env[0] = NULL;
+
+    argc = 1;
+    argv = malloc(sizeof(char*));
+    argv[0] = strdup(filename);
+
+    start_executing(entry_point, stack_base, argc, argv, env);
+
+    free(argv[0]);
+    free(env);
+    free(argv);
 error:
     if (loadcmds)
         free(loadcmds);
