@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -19,6 +20,7 @@ typedef struct {
     struct mach_header *header;
     const char *symbol_strings;
     struct nlist* symbols;
+    int n_symbols;
     FILE *fp;
     int stack_base;
 } Loader;
@@ -166,6 +168,7 @@ loader_parse_commands(Loader *loader)
                                            loader->linkeditcmd->fileoff);
             loader->symbol_strings = (const char*)&linkedit[symtab->stroff];
             loader->symbols = (struct nlist*)(&linkedit[symtab->symoff]);
+            loader->n_symbols = symtab->nsyms;
             break;
         }
         case LC_UNIXTHREAD: {
@@ -210,6 +213,68 @@ loader_create_stack(Loader *loader)
     return 0;
 }
 
+static int
+loader_bind_indirect_symbols(Loader *loader)
+{
+    struct load_command *loadcmd;
+    int i, j;
+    struct segment_command *segcmd;
+    struct section *section, *last, *sections;
+    uint8_t* linkedit = (uint8_t*)(loader->linkeditcmd->vmaddr -
+                                   loader->linkeditcmd->fileoff);
+    uint8_t* entry;
+    uint32_t* indirect_table = (uint32_t*)&linkedit[loader->dysymtabcmd->indirectsymoff];
+
+    static void *handle = NULL;
+
+    for (i = 0, loadcmd = loader->loadcmds; i < loader->header->ncmds; ++i,
+        loadcmd = (struct load_command*)((int)(loadcmd)+(loadcmd->cmdsize))) {
+        if (loadcmd->cmd != LC_SEGMENT)
+            continue;
+        segcmd = (struct segment_command*)loadcmd;
+        sections = (struct section*)((char*)segcmd + sizeof(struct segment_command));
+        last = &sections[segcmd->nsects];
+        for (section = sections; section < last; ++section) {
+            uint8_t* start = (uint8_t*)(section->addr);
+            uint8_t* end = start + section->size;
+            uint32_t indirect_offset = section->reserved1;
+            uint8_t type = section->flags & SECTION_TYPE;
+            if ((type != S_SYMBOL_STUBS) ||
+                !(section->flags & S_ATTR_SELF_MODIFYING_CODE) ||
+                (section->reserved2 != 5)) {
+                continue;
+            }
+
+            for (j = 0, entry = start; entry < end; entry += 5, ++j) {
+                uint32_t symbol;
+                const char* symbol_name;
+                uint32_t symbol_address;
+                uintptr_t func;
+
+                symbol = indirect_table[indirect_offset + j];
+                if (symbol >= loader->n_symbols)
+                    break;
+                symbol_name = &loader->symbol_strings[loader->symbols[symbol].n_strx];
+                if (!handle)
+                    handle = dlopen(NULL, 0);
+                func = dlsym(handle, symbol_name + 1);
+                if (!func) {
+                    fprintf(stderr, "undefined symbol: %s\n", symbol_name);
+                    return 1;
+                }
+                uint32_t rel32 = func - (((uint32_t)entry)+5);
+
+                entry[0] = 0xE8; // CALL rel32
+                entry[1] = rel32 & 0xFF;
+                entry[2] = (rel32 >> 8) & 0xFF;
+                entry[3] = (rel32 >> 16) & 0xFF;
+                entry[4] = (rel32 >> 24) & 0xFF;
+            }
+        }
+    }
+    return 0;
+}
+
 static inline void
 loader_execute(Loader *loader)
 {
@@ -231,7 +296,7 @@ loader_execute(Loader *loader)
     __asm__("push %0" : : "g" (argv[0]));
     __asm__("push %0" : : "g" (0));
 
-#ifdef DEBUG
+#if 0
     __asm__("int $03");
 #endif
     /* jump to the executable entry point, start: */
@@ -256,12 +321,18 @@ int main(int argc, char **argv)
 	    loader_free(loader);
 	    return 1;
     }
+
     if (loader_parse_commands(loader)) {
 	    loader_free(loader);
 	    return 1;
     }
 
     if (loader_create_stack(loader)) {
+	    loader_free(loader);
+	    return 1;
+    }
+
+    if (loader_bind_indirect_symbols(loader)) {
 	    loader_free(loader);
 	    return 1;
     }

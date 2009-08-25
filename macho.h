@@ -86,6 +86,10 @@ struct segment_command
 #define VM_PROT_EXECUTE 0x04
 
 /* section state */
+#define SECTION_TYPE            0x000000ff
+#define S_SYMBOL_STUBS          0x8
+#define S_ATTR_SELF_MODIFYING_CODE 0x04000000
+
 struct section
 {
    char sectname[16];
