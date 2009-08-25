@@ -12,6 +12,7 @@
 typedef struct {
     struct load_command *loadcmds;
     struct thread_command* threadcmd;
+    struct dysymtab_command* dysymtabcmd;
     const char *filename;
     struct mach_header *header;
     FILE *fp;
@@ -160,6 +161,7 @@ loader_parse_commands(Loader *loader)
             break;
         }
         case LC_DYSYMTAB:
+            loader->dysymtabcmd = (struct dysymtab_command*)loadcmd;
             break;
         case LC_LOAD_DYLINKER:
             break;
