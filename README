@@ -1,0 +1,9 @@
+Recent versions of linux doesn't allow mmap() on addresses lower than
+65535 per default as a protection against buffer overflows.
+
+MacOS X has its own protection (one page without permissions), but uses
+pages between 4k and 64k by default, so currently the loader requires
+that the default limit is set to 0.
+
+  sysctl vm.mmap_min_addr=0
+
