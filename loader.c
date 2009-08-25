@@ -7,8 +7,38 @@
 
 #include "macho.h"
 
+#define STACK_SIZE (8192 * 1024)
+
+typedef struct {
+    struct load_command *loadcmds;
+    struct thread_command* threadcmd;
+    const char *filename;
+    struct mach_header *header;
+    FILE *fp;
+    int stack_base;
+} Loader;
+
+static Loader *
+loader_new()
+{
+    Loader *loader = (Loader *)malloc(sizeof(Loader));
+    bzero(loader, sizeof(Loader));
+    return loader;
+}
+
 static void
-map_segment_command(FILE *fp, const struct segment_command *command)
+loader_free(Loader *loader)
+{
+    if (loader->loadcmds)
+        free(loader->loadcmds);
+    if (loader->header)
+        free(loader->header);
+    fclose(loader->fp);
+}
+
+static void
+loader_map_segment_command(Loader *loader, 
+                           const struct segment_command *command)
 {
     int mmap_prot = 0;
 
@@ -41,121 +71,92 @@ map_segment_command(FILE *fp, const struct segment_command *command)
     }
 
     if (mmap((void*)command->vmaddr, command->filesize, mmap_prot,
-             MAP_FIXED | MAP_PRIVATE, fileno(fp),
+             MAP_FIXED | MAP_PRIVATE, fileno(loader->fp),
              /* fixme: fat offset*/ 0 + command->fileoff) == (void*)-1) {
             fprintf(stderr, "failed to map %s segment: %s\n",
                     command->segname, strerror(errno));
     }
 }
 
-#define STACK_SIZE (8192 * 1024)
-
 static int
-create_stack(void)
+loader_parse_header(Loader *loader, const char *filename)
 {
-    int * stack;
-
-    stack = mmap(0, STACK_SIZE,
-                 PROT_READ | PROT_WRITE,
-                 MAP_PRIVATE | MAP_ANONYMOUS,
-                 -1, 0);
-    if (stack == (void*)-1) {
-        fprintf(stderr, "failed to map page zero segment: %s\n",
-                strerror(errno));
-    }
-
-    bzero(stack, STACK_SIZE);
-    return (int)stack + STACK_SIZE;
-}
-
-static inline void
-start_executing(int entry_point, int stack_base,
-                int argc, char **argv, char **env)
-{
-    __asm__("push %0" : : "g" (argc));
-    __asm__("push %0" : : "g" (argv[0]));
-    __asm__("push %0" : : "g" (0));
-    __asm__("push %0" : : "g" (env[0]));
-    __asm__("push %0" : : "g" (0));
-    __asm__("push %0" : : "g" (argv[0]));
-    __asm__("push %0" : : "g" (0));
-
-#ifdef DEBUG
-    __asm__("int $03");
-#endif
-    /* jump to the executable entry point, start: */
-    __asm__("jmp *%0" : : "g" (entry_point));
-}
-
-static int
-open_executable(const char * filename)
-{
-    FILE *fp;
-    struct mach_header *header = NULL;
-    struct load_command *loadcmds = NULL, *loadcmd;
-    int i;
-    int entry_point;
-    int stack_base;
-    char **env, **argv;
-    int argc;
-
-    fp = fopen(filename, "r");
-    if (!fp) {
+    loader->filename = filename;
+    
+    loader->fp = fopen(filename, "r");
+    if (!loader->fp) {
         fprintf(stderr, "error opening file: %s\n", strerror(errno));
         return 1;
     }
 
-    header = (struct mach_header*)malloc(sizeof(struct mach_header));
+    loader->header = (struct mach_header*)malloc(sizeof(struct mach_header));
     errno = 0;
-    fread(header, sizeof(struct mach_header), 1, fp);
+    fread(loader->header, sizeof(struct mach_header), 1, loader->fp);
     if (errno) {
         fprintf(stderr, "error reading file: %s\n", strerror(errno));
-        goto error;
+        return 1;
     }
 
-    if (header->magic != MH_MAGIC) {
+    if (loader->header->magic != MH_MAGIC) {
         fprintf(stderr, "error: %s is not a Mach-O binary (magic was %x).\n",
-                filename, header->magic);
-        goto error;
+                filename, loader->header->magic);
+        return 1;
     }
 
 #ifdef __i386__
-    if (header->cputype != CPU_TYPE_X86) {
+    if (loader->header->cputype != CPU_TYPE_X86) {
         fprintf(stderr, "error: %s is not a x86 binary (cputype: %d).\n",
-                filename, header->cputype);
-        goto error;
+                loader->filename, loader->header->cputype);
+        return 1;
     }
 #else
 #  error "unsupported architecture"
 #endif
 
-    switch (header->filetype) {
+    switch (loader->header->filetype) {
       case MH_EXECUTE:
         break;
       default:
-        fprintf(stderr, "ERROR: Unsupported Mach-O file types: %d\n", header->filetype);
-        goto error;
+        fprintf(stderr, "ERROR: Unsupported Mach-O file types: %d\n", 
+                loader->header->filetype);
+        return 1;
     }
 
-    loadcmds = malloc(header->sizeofcmds);
-    if (fread(loadcmds, header->sizeofcmds, 1, fp) < 0) {
+    return 0;
+}
+
+static int
+loader_parse_commands(Loader *loader)
+{
+    struct load_command *loadcmd;
+    int i;
+ 
+    loader->loadcmds = malloc(loader->header->sizeofcmds);
+
+    if (fread(loader->loadcmds, 
+              loader->header->sizeofcmds, 1, loader->fp) < 0) {
         fprintf(stderr, "error reading file: %s\n", strerror(errno));
-        goto error;
+        return 1;
     }
-
-    for (i = 0, loadcmd = loadcmds; i < header->ncmds; ++i,
+    
+    for (i = 0, loadcmd = loader->loadcmds; i < loader->header->ncmds; ++i,
         loadcmd = (struct load_command*)((int)(loadcmd)+(loadcmd->cmdsize))) {
         switch(loadcmd->cmd) {
         case LC_SEGMENT: {
             struct segment_command *segcmd = (struct segment_command*)loadcmd;
-            map_segment_command(fp, segcmd);
+            loader_map_segment_command(loader, segcmd);
+	    struct section *section, *last, *sections = (struct section*)
+            	((char*)segcmd + sizeof(struct segment_command));
+	    last = &sections[segcmd->nsects];
+	    for (section = sections; section < last; ++section) {
+		printf(" - section: %s\n", section->sectname);
+	    }	
             break;
         }
         case LC_SYMTAB:
             break;
         case LC_UNIXTHREAD: {
-            struct thread_command *threadcmd = (struct thread_command*)loadcmd;
-            entry_point = threadcmd->state.eip;
+            loader->threadcmd = (struct thread_command*)loadcmd;
             break;
         }
         case LC_DYSYMTAB:
@@ -168,39 +169,92 @@ open_executable(const char * filename)
             break;
         default:
             fprintf(stderr, "load command 0x%02x not supported\n", loadcmd->cmd);
-            break;
+            return 1;
         }
     }
+    return 0;
+}
 
-    stack_base = create_stack();
+static int
+loader_create_stack(Loader *loader)
+{
+    int * stack;
 
+    stack = mmap(0, STACK_SIZE,
+                 PROT_READ | PROT_WRITE,
+                 MAP_PRIVATE | MAP_ANONYMOUS,
+                 -1, 0);
+    if (stack == (void*)-1) {
+        fprintf(stderr, "failed to map page zero segment: %s\n",
+                strerror(errno));
+	return 1;
+    }
+
+    bzero(stack, STACK_SIZE);
+    loader->stack_base = (int)stack + STACK_SIZE;
+
+    return 0;
+}
+
+static inline void
+loader_execute(Loader *loader)
+{
+    char **env, **argv;
+    int argc;
+    
     env = malloc(sizeof(char*));
     env[0] = NULL;
 
     argc = 1;
     argv = malloc(sizeof(char*));
-    argv[0] = strdup(filename);
+    argv[0] = strdup(loader->filename);
 
-    start_executing(entry_point, stack_base, argc, argv, env);
+    __asm__("push %0" : : "g" (argc));
+    __asm__("push %0" : : "g" (argv[0]));
+    __asm__("push %0" : : "g" (0));
+    __asm__("push %0" : : "g" (env[0]));
+    __asm__("push %0" : : "g" (0));
+    __asm__("push %0" : : "g" (argv[0]));
+    __asm__("push %0" : : "g" (0));
 
+#ifdef DEBUG
+    __asm__("int $03");
+#endif
+    /* jump to the executable entry point, start: */
+    __asm__("jmp *%0" : : "g" (loader->threadcmd->state.eip));
+    
     free(argv[0]);
     free(env);
     free(argv);
-error:
-    if (loadcmds)
-        free(loadcmds);
-    if (header)
-        free(header);
-    fclose(fp);
-    return 0;
 }
 
 int main(int argc, char **argv)
 {
+    Loader *loader;
+    
     if (argc < 2) {
         fprintf(stderr, "usage: %s binary [args]\n", argv[0]);
         return 1;
     }
 
-    return open_executable(argv[1]);
+    loader = loader_new();
+    if (loader_parse_header(loader, argv[1])) {
+	loader_free(loader);
+	return 1;
+    }
+    if (loader_parse_commands(loader)) {
+	loader_free(loader);
+	return 1;
+    }
+	
+    if (loader_create_stack(loader)) {
+	loader_free(loader);
+	return 1;
+    }
+
+    loader_execute(loader);
+
+    loader_free(loader);
+
+    return 0;
 }
