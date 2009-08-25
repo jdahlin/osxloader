@@ -7,3 +7,7 @@ that the default limit is set to 0.
 
   sysctl vm.mmap_min_addr=0
 
+
+binfmt support
+
+echo ':MachO:M::\xce\xfa\xed\xfe::/path/to/loader:' > /proc/sys/fs/binfmt_misc/register
