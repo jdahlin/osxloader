@@ -49,10 +49,6 @@ loader_map_segment_command(Loader *loader,
 {
     int mmap_prot = 0;
 
-    fprintf(stderr, "name: %-16s prot: 0x%02x, size: 0x%04x, off: 0x%04x\n",
-            command->segname, command->initprot, command->cmdsize,
-            command->fileoff);
-
     if (command->initprot & VM_PROT_READ)
         mmap_prot |= PROT_READ;
     if (command->initprot & VM_PROT_WRITE)
@@ -154,12 +150,6 @@ loader_parse_commands(Loader *loader)
             loader_map_segment_command(loader, segcmd);
             if (!strcmp(segcmd->segname, "__LINKEDIT"))
                 loader->linkeditcmd = segcmd;
-	        struct section *section, *last, *sections = (struct section*)
-	            ((char*)segcmd + sizeof(struct segment_command));
-	        last = &sections[segcmd->nsects];
-	        for (section = sections; section < last; ++section) {
-		        printf(" - section: %s\n", section->sectname);
-	        }
             break;
         }
         case LC_SYMTAB: {
@@ -246,7 +236,7 @@ loader_bind_indirect_symbols(Loader *loader)
             }
 
             for (j = 0, entry = start; entry < end; entry += 5, ++j) {
-                uint32_t symbol;
+                uint32_t symbol, rel32;
                 const char* symbol_name;
                 uintptr_t func;
 
@@ -261,8 +251,8 @@ loader_bind_indirect_symbols(Loader *loader)
                     fprintf(stderr, "undefined symbol: %s\n", symbol_name);
                     return 1;
                 }
-                uint32_t rel32 = func - (((uint32_t)entry)+5);
 
+                rel32 = func - (((uint32_t)entry)+5);
                 entry[0] = 0xE9; // JMP rel32
                 entry[1] = rel32 & 0xFF;
                 entry[2] = (rel32 >> 8) & 0xFF;
