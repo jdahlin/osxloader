@@ -248,7 +248,6 @@ loader_bind_indirect_symbols(Loader *loader)
             for (j = 0, entry = start; entry < end; entry += 5, ++j) {
                 uint32_t symbol;
                 const char* symbol_name;
-                uint32_t symbol_address;
                 uintptr_t func;
 
                 symbol = indirect_table[indirect_offset + j];
@@ -257,7 +256,7 @@ loader_bind_indirect_symbols(Loader *loader)
                 symbol_name = &loader->symbol_strings[loader->symbols[symbol].n_strx];
                 if (!handle)
                     handle = dlopen(NULL, 0);
-                func = dlsym(handle, symbol_name + 1);
+                func = (uintptr_t)dlsym(handle, symbol_name + 1);
                 if (!func) {
                     fprintf(stderr, "undefined symbol: %s\n", symbol_name);
                     return 1;
