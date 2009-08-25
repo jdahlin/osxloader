@@ -14,8 +14,11 @@ typedef struct {
     struct load_command *loadcmds;
     const struct thread_command* threadcmd;
     const struct dysymtab_command* dysymtabcmd;
+    const struct segment_command *linkeditcmd;
     const char *filename;
     struct mach_header *header;
+    const char *symbol_strings;
+    struct nlist* symbols;
     FILE *fp;
     int stack_base;
 } Loader;
@@ -147,6 +150,8 @@ loader_parse_commands(Loader *loader)
         case LC_SEGMENT: {
             struct segment_command *segcmd = (struct segment_command*)loadcmd;
             loader_map_segment_command(loader, segcmd);
+            if (!strcmp(segcmd->segname, "__LINKEDIT"))
+                loader->linkeditcmd = segcmd;
 	        struct section *section, *last, *sections = (struct section*)
 	            ((char*)segcmd + sizeof(struct segment_command));
 	        last = &sections[segcmd->nsects];
@@ -155,8 +160,14 @@ loader_parse_commands(Loader *loader)
 	        }
             break;
         }
-        case LC_SYMTAB:
+        case LC_SYMTAB: {
+            struct symtab_command* symtab = (struct symtab_command*)loadcmd;
+            const uint8_t* linkedit = (uint8_t*)(loader->linkeditcmd->vmaddr -
+                                           loader->linkeditcmd->fileoff);
+            loader->symbol_strings = (const char*)&linkedit[symtab->stroff];
+            loader->symbols = (struct nlist*)(&linkedit[symtab->symoff]);
             break;
+        }
         case LC_UNIXTHREAD: {
             loader->threadcmd = (struct thread_command*)loadcmd;
             break;

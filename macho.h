@@ -153,3 +153,25 @@ struct dysymtab_command
    uint32_t nlocrel;
 };
 
+/* symbol table */
+
+struct symtab_command
+{
+   uint32_t cmd;
+   uint32_t cmdsize;
+   uint32_t symoff;
+   uint32_t nsyms;
+   uint32_t stroff;
+   uint32_t strsize;
+};
+
+/* symbol table entry */
+
+struct nlist
+{
+   int32_t n_strx;
+   uint8_t n_type;
+   uint8_t n_sect;
+   int16_t n_desc;
+   uint32_t n_value;
+};
