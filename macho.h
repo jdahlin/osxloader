@@ -1,8 +1,10 @@
 #include <stdint.h>
 
+/* mach-o header */
 #define MH_MAGIC  0xfeedface
 
-struct mach_header {
+struct mach_header
+{
    uint32_t magic;
    uint32_t cputype;
    uint32_t cpusubtype;
@@ -31,7 +33,8 @@ struct mach_header {
 #define MH_DSYM       0xa
 
 /* load commads */
-struct load_command {
+struct load_command
+{
    uint32_t cmd;
    uint32_t cmdsize;
 };
@@ -63,7 +66,7 @@ struct load_command {
 
 /* segment state */
 struct segment_command
-   {
+{
    uint32_t cmd;
    uint32_t cmdsize;
    char segname[16];
@@ -83,9 +86,8 @@ struct segment_command
 #define VM_PROT_EXECUTE 0x04
 
 /* section state */
-
 struct section
-   {
+{
    char sectname[16];
    char segname[16];
    uint32_t addr;
@@ -100,35 +102,40 @@ struct section
 };
 
 /* thread state */
-typedef struct mach_i386_thread_state {
-      unsigned int eax;
-      unsigned int ebx;
-      unsigned int ecx;
-      unsigned int edx;
-      unsigned int edi;
-      unsigned int esi;
-      unsigned int ebp;
-      unsigned int esp;
-      unsigned int ss;
-      unsigned int eflags;
-      unsigned int eip;
-      unsigned int cs;
-      unsigned int ds;
-      unsigned int es;
-      unsigned int fs;
-      unsigned int gs;
+typedef struct mach_i386_thread_state
+{
+    unsigned int eax;
+    unsigned int ebx;
+    unsigned int ecx;
+    unsigned int edx;
+    unsigned int edi;
+    unsigned int esi;
+    unsigned int ebp;
+    unsigned int esp;
+    unsigned int ss;
+    unsigned int eflags;
+    unsigned int eip;
+    unsigned int cs;
+    unsigned int ds;
+    unsigned int es;
+    unsigned int fs;
+    unsigned int gs;
 } mach_i386_thread_state_t;
 
-struct thread_command {
+struct thread_command
+{
     uint32_t cmd;
     uint32_t cmdsize;
     uint32_t flavor;
     uint32_t count;
+#ifdef __i386__
     struct mach_i386_thread_state state;
+#else
+#  error "unsupported cpu arch"
+#endif
 };
 
 /* dynamic symbol table */
-
 struct dysymtab_command
 {
    uint32_t cmd;
@@ -154,7 +161,6 @@ struct dysymtab_command
 };
 
 /* symbol table */
-
 struct symtab_command
 {
    uint32_t cmd;
@@ -166,7 +172,6 @@ struct symtab_command
 };
 
 /* symbol table entry */
-
 struct nlist
 {
    int32_t n_strx;
