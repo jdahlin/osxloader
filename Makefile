@@ -1,5 +1,5 @@
 loader: loader.c macho.h
-	gcc -m32 -o loader loader.c
+	gcc -Wall -m32 -o loader loader.c
 
 test: loader
 	./loader true
