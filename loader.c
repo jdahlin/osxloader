@@ -264,7 +264,7 @@ loader_bind_indirect_symbols(Loader *loader)
                 }
                 uint32_t rel32 = func - (((uint32_t)entry)+5);
 
-                entry[0] = 0xE8; // CALL rel32
+                entry[0] = 0xE9; // JMP rel32
                 entry[1] = rel32 & 0xFF;
                 entry[2] = (rel32 >> 8) & 0xFF;
                 entry[3] = (rel32 >> 16) & 0xFF;
