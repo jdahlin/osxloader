@@ -11,8 +11,8 @@
 
 typedef struct {
     struct load_command *loadcmds;
-    struct thread_command* threadcmd;
-    struct dysymtab_command* dysymtabcmd;
+    const struct thread_command* threadcmd;
+    const struct dysymtab_command* dysymtabcmd;
     const char *filename;
     struct mach_header *header;
     FILE *fp;
