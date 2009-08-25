@@ -39,7 +39,7 @@ loader_free(Loader *loader)
 }
 
 static void
-loader_map_segment_command(Loader *loader, 
+loader_map_segment_command(Loader *loader,
                            const struct segment_command *command)
 {
     int mmap_prot = 0;
@@ -84,7 +84,7 @@ static int
 loader_parse_header(Loader *loader, const char *filename)
 {
     loader->filename = filename;
-    
+
     loader->fp = fopen(filename, "r");
     if (!loader->fp) {
         fprintf(stderr, "error opening file: %s\n", strerror(errno));
@@ -119,7 +119,7 @@ loader_parse_header(Loader *loader, const char *filename)
       case MH_EXECUTE:
         break;
       default:
-        fprintf(stderr, "ERROR: Unsupported Mach-O file types: %d\n", 
+        fprintf(stderr, "ERROR: Unsupported Mach-O file types: %d\n",
                 loader->header->filetype);
         return 1;
     }
@@ -132,27 +132,27 @@ loader_parse_commands(Loader *loader)
 {
     struct load_command *loadcmd;
     int i;
- 
+
     loader->loadcmds = malloc(loader->header->sizeofcmds);
 
-    if (fread(loader->loadcmds, 
+    if (fread(loader->loadcmds,
               loader->header->sizeofcmds, 1, loader->fp) < 0) {
         fprintf(stderr, "error reading file: %s\n", strerror(errno));
         return 1;
     }
-    
+
     for (i = 0, loadcmd = loader->loadcmds; i < loader->header->ncmds; ++i,
         loadcmd = (struct load_command*)((int)(loadcmd)+(loadcmd->cmdsize))) {
         switch(loadcmd->cmd) {
         case LC_SEGMENT: {
             struct segment_command *segcmd = (struct segment_command*)loadcmd;
             loader_map_segment_command(loader, segcmd);
-	    struct section *section, *last, *sections = (struct section*)
-            	((char*)segcmd + sizeof(struct segment_command));
-	    last = &sections[segcmd->nsects];
-	    for (section = sections; section < last; ++section) {
-		printf(" - section: %s\n", section->sectname);
-	    }	
+	        struct section *section, *last, *sections = (struct section*)
+	            ((char*)segcmd + sizeof(struct segment_command));
+	        last = &sections[segcmd->nsects];
+	        for (section = sections; section < last; ++section) {
+		        printf(" - section: %s\n", section->sectname);
+	        }
             break;
         }
         case LC_SYMTAB:
@@ -190,7 +190,7 @@ loader_create_stack(Loader *loader)
     if (stack == (void*)-1) {
         fprintf(stderr, "failed to map page zero segment: %s\n",
                 strerror(errno));
-	return 1;
+	    return 1;
     }
 
     bzero(stack, STACK_SIZE);
@@ -204,7 +204,7 @@ loader_execute(Loader *loader)
 {
     char **env, **argv;
     int argc;
-    
+
     env = malloc(sizeof(char*));
     env[0] = NULL;
 
@@ -225,7 +225,7 @@ loader_execute(Loader *loader)
 #endif
     /* jump to the executable entry point, start: */
     __asm__("jmp *%0" : : "g" (loader->threadcmd->state.eip));
-    
+
     free(argv[0]);
     free(env);
     free(argv);
@@ -234,7 +234,7 @@ loader_execute(Loader *loader)
 int main(int argc, char **argv)
 {
     Loader *loader;
-    
+
     if (argc < 2) {
         fprintf(stderr, "usage: %s binary [args]\n", argv[0]);
         return 1;
@@ -242,17 +242,17 @@ int main(int argc, char **argv)
 
     loader = loader_new();
     if (loader_parse_header(loader, argv[1])) {
-	loader_free(loader);
-	return 1;
+	    loader_free(loader);
+	    return 1;
     }
     if (loader_parse_commands(loader)) {
-	loader_free(loader);
-	return 1;
+	    loader_free(loader);
+	    return 1;
     }
-	
+
     if (loader_create_stack(loader)) {
-	loader_free(loader);
-	return 1;
+	    loader_free(loader);
+	    return 1;
     }
 
     loader_execute(loader);
