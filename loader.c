@@ -1,5 +1,4 @@
 #include "config.h"
-#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -8,6 +7,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#ifdef HAVE_DLFCN_H
+# include <dlfcn.h>
+#endif
 #ifdef HAVE_SYS_CAPABILITY_H
 # include <sys/capability.h>
 #endif

@@ -5,7 +5,6 @@ bin_PROGRAMS = loader
 
 loader_SOURCES = loader.c loader.h
 loader_CFLAGS = -m32
-loader_LDFLAGS = -ldl
 
 test: loader
 	./loader true
