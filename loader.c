@@ -142,6 +142,28 @@ loader_drop_privileges(Loader *loader)
 }
 
 static int
+loader_drop_privileges(Loader *loader)
+{
+    cap_t caps;
+
+    caps = cap_init();
+    if (caps == NULL)
+        /* no caps set */
+        return 1;
+
+    if (cap_clear(caps) == -1)
+        return 1;
+
+    if (cap_set_proc(caps) == -1)
+        return 1;
+
+    if (cap_free(caps) == -1)
+        return 1;
+
+    return 0;
+}
+
+static int
 loader_parse_commands(Loader *loader)
 {
     struct load_command *loadcmd;
