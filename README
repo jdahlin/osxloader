@@ -1,3 +1,5 @@
+mmaping of segments
+===================
 Recent versions of linux doesn't allow mmap() on addresses lower than
 65535 per default as a protection against buffer overflows.
 
@@ -5,9 +7,20 @@ MacOS X has its own protection (one page without permissions), but uses
 pages between 4k and 64k by default, so currently the loader requires
 that the default limit is set to 0.
 
-  sysctl vm.mmap_min_addr=0
+There are two ways of doing it. One for all the processes using sysctl:
 
+  # sysctl vm.mmap_min_addr=0
+
+The other is enabling CAP_SYS_RAWIO for a specific process. That in turn
+requires extended attributes to be enabled, as the capabilities are stored
+as an extended attribute.
+
+  # mount -o remount,user_attr /
+  # setcap cap_sys_rawio+ep /path/to/loader
+
+Ubuntu 9.10, aka "Karmic" sets the minimal mmap address in the kernel
+to 65535 so you will need to enable CAP_SYS_RAWIO instead.
 
 binfmt support
-
+==============
 echo ':MachO:M::\xce\xfa\xed\xfe::/path/to/loader:' > /proc/sys/fs/binfmt_misc/register
