@@ -86,6 +86,8 @@ loader_map_segment_command(Loader *loader,
 static int
 loader_parse_header(Loader *loader, const char *filename)
 {
+    size_t bytes_read;
+
     loader->filename = filename;
 
     loader->fp = fopen(filename, "r");
@@ -95,9 +97,8 @@ loader_parse_header(Loader *loader, const char *filename)
     }
 
     loader->header = (struct mach_header*)malloc(sizeof(struct mach_header));
-    errno = 0;
-    fread(loader->header, sizeof(struct mach_header), 1, loader->fp);
-    if (errno) {
+    bytes_read = fread(loader->header, sizeof(struct mach_header), 1, loader->fp);
+    if (bytes_read != sizeof(struct mach_header) && errno) {
         fprintf(stderr, "error reading file: %s\n", strerror(errno));
         return 1;
     }
@@ -168,11 +169,13 @@ loader_parse_commands(Loader *loader)
 {
     struct load_command *loadcmd;
     int i;
+    size_t bytes_read;
 
     loader->loadcmds = malloc(loader->header->sizeofcmds);
 
-    if (fread(loader->loadcmds,
-              loader->header->sizeofcmds, 1, loader->fp) < 0) {
+    bytes_read = fread(loader->loadcmds,
+              loader->header->sizeofcmds, 1, loader->fp);
+    if (bytes_read != loader->header->sizeofcmds && errno) {
         fprintf(stderr, "error reading file: %s\n", strerror(errno));
         return 1;
     }
