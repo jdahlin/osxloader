@@ -136,17 +136,6 @@ loader_parse_header(Loader *loader, const char *filename)
     return 0;
 }
 
-static void
-loader_drop_privileges(Loader *loader)
-{
-    cap_t caps;
-
-    caps = cap_init();
-    cap_clear(caps);
-    cap_set_proc(caps);
-    cap_free(caps);
-}
-
 static int
 loader_drop_privileges(Loader *loader)
 {
