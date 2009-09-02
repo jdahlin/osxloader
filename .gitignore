@@ -1,3 +1,13 @@
+.deps
 *.swp
+*.o
 loader
 true
+autom4te.cache
+Makefile
+Makefile.in
+config.log
+config.status
+configure
+aclocal.m4
+
