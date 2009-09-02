@@ -14,6 +14,10 @@ AC_PROG_CC
 AC_ISC_POSIX
 AC_HEADER_STDC
 
+dnl Capabilities
+AC_SEARCH_LIBS([cap_init], [cap], [], [AC_MSG_ERROR([*** POSIX caps libraries not found])])
+AC_CHECK_HEADERS([sys/capability.h], [], [AC_MSG_ERROR([*** POSIX caps headers not found])])
+
 AC_CONFIG_FILES([
 Makefile
 ])

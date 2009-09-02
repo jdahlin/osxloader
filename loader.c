@@ -1,3 +1,4 @@
+#include "config.h"
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -7,7 +8,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <sys/capability.h>
+#ifdef HAVE_SYS_CAPABILITY_H
+# include <sys/capability.h>
+#endif
 
 #include "macho.h"
 
