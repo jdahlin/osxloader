@@ -1,3 +1,12 @@
+osxloader
+=========
+
+A project to load Mach-O executables on Linux and execute them, in somewhat similar
+spirit as the wine project. Only tested with MacOS X 10.5 executables.
+
+It was able to execute hello world at some point and correctly read strings from
+the right segment, call puts and call exit.
+
 mmaping of segments
 ===================
 Recent versions of linux doesn't allow mmap() on addresses lower than
